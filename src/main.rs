@@ -84,13 +84,17 @@ impl rustc_driver::Callbacks for MyCallback {
                         };
                         if let Some((fname, did, args)) = f_did {
                             println!("----- bb {} -----", i.index());
+                            println!("{:?}", terminator.source_info.span);
                             println!("{:?}, {}, {:?}", fname, tcx.is_foreign_item(did), args);
-                            for arg in args {
+                            for (i, arg) in args.into_iter().enumerate() {
                                 let p = arg.place();
                                 if p == None {
                                     continue;
                                 }
-                                println!("{:?}", p.unwrap().local);
+                                let t = arg.ty(mir_body, tcx);
+                                if t.is_unsafe_ptr() {
+                                    println!("Unsafe ptr: {:?}, {}th arg", t, i + 1);
+                                }
                             }
                             // println!("{:?}", hir.fn_decl_by_hir_id(hir.local_def_id_to_hir_id(did)));
                         }
