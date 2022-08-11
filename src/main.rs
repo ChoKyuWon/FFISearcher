@@ -1,12 +1,16 @@
 #![feature(rustc_private)]
 extern crate rustc_driver;
+extern crate rustc_hir;
 extern crate rustc_interface;
 extern crate rustc_middle;
+extern crate rustc_target;
 
 use rustc_driver::Compilation;
+use rustc_hir::{ForeignItemId, ItemKind};
 use rustc_interface::interface::Compiler;
 use rustc_interface::Queries;
 use rustc_middle::mir::TerminatorKind;
+use rustc_target::spec::abi::Abi;
 struct MyCallback;
 
 impl MyCallback {
@@ -23,9 +27,24 @@ impl rustc_driver::Callbacks for MyCallback {
     ) -> Compilation {
         queries.global_ctxt().unwrap().peek_mut().enter(|tcx| {
             let hir = tcx.hir();
+            let mut FFI_id: Vec<ForeignItemId> = Vec::new();
+
+            // In this step, we try to find all FFI items
             for id in hir.items() {
                 let item = hir.item(id);
+                if let ItemKind::ForeignMod { abi, items } = item.kind {
+                    if let Abi::C { .. } = abi {
+                        // Now we found FFI function decl;
+                        for i in items {
+                            FFI_id.push(i.id);
+                        }
+                    }
+                }
+            }
+            println!("{:?}", FFI_id);
 
+            // In this step, we try to find all FFI usage
+            for id in hir.items() {
                 if tcx.is_mir_available(id.def_id) {
                     let mir_body = tcx.optimized_mir(id.def_id);
                     println!("============================================================");
@@ -63,12 +82,17 @@ impl rustc_driver::Callbacks for MyCallback {
                             }
                             _ => None,
                         };
-                        match f_did {
-                            Some((fname, did, arg)) => {
-                                println!("----- bb {} -----", i.index());
-                                println!("{:?}, {}, {:?}", fname, tcx.is_foreign_item(did), arg);
+                        if let Some((fname, did, args)) = f_did {
+                            println!("----- bb {} -----", i.index());
+                            println!("{:?}, {}, {:?}", fname, tcx.is_foreign_item(did), args);
+                            for arg in args {
+                                let p = arg.place();
+                                if p == None {
+                                    continue;
+                                }
+                                println!("{:?}", p.unwrap().local);
                             }
-                            None => {}
+                            // println!("{:?}", hir.fn_decl_by_hir_id(hir.local_def_id_to_hir_id(did)));
                         }
                     }
                 }
