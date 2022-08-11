@@ -19,9 +19,8 @@ impl rustc_driver::Callbacks for MyCallback {
     fn after_analysis<'tcx>(
         &mut self,
         compiler: &Compiler,
-        queries: &'tcx Queries<'tcx>
+        queries: &'tcx Queries<'tcx>,
     ) -> Compilation {
-
         queries.global_ctxt().unwrap().peek_mut().enter(|tcx| {
             let hir = tcx.hir();
             for id in hir.items() {
@@ -32,7 +31,7 @@ impl rustc_driver::Callbacks for MyCallback {
                     println!("============================================================");
 
                     for (i, bb) in mir_body.basic_blocks().iter_enumerated() {
-                        // Statement traversal       
+                        // Statement traversal
                         // for statement in &bb.statements {
                         //     print!("{:?}", statement);
                         //     if let rustc_middle::mir::ClearCrossCrate::Set(source_scope_local_data) = &mir_body.source_scopes[statement.source_info.scope].local_data {
@@ -54,23 +53,22 @@ impl rustc_driver::Callbacks for MyCallback {
                         //     }
                         // }
                         let f_did = match &terminator.kind {
-                            TerminatorKind::Call{
-                                func, args, ..} => {
-                                    let opt = func.const_fn_def().unwrap().0.as_local();
-                                    if  opt == None{
-                                        None
-                                    } else{
-                                        Some((func, opt.unwrap(), args))
-                                    }
-                                },
-                            _=>{None},
+                            TerminatorKind::Call { func, args, .. } => {
+                                let opt = func.const_fn_def().unwrap().0.as_local();
+                                if opt == None {
+                                    None
+                                } else {
+                                    Some((func, opt.unwrap(), args))
+                                }
+                            }
+                            _ => None,
                         };
                         match f_did {
                             Some((fname, did, arg)) => {
                                 println!("----- bb {} -----", i.index());
                                 println!("{:?}, {}, {:?}", fname, tcx.is_foreign_item(did), arg);
-                            },
-                            None => {},
+                            }
+                            None => {}
                         }
                     }
                 }
@@ -82,10 +80,15 @@ impl rustc_driver::Callbacks for MyCallback {
 }
 
 fn main() {
-//    let mut callbacks = rustc_driver::TimePassesCallbacks::default();
+    //    let mut callbacks = rustc_driver::TimePassesCallbacks::default();
     let mut callbacks = MyCallback::new();
 
-    let rustc_args = vec!["run".to_string(), "FFI.rs".to_string(), "--sysroot".to_string(), "/home/kyuwoncho18/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu".to_string()];
+    let rustc_args = vec![
+        "run".to_string(),
+        "FFI.rs".to_string(),
+        "--sysroot".to_string(),
+        "/home/kyuwoncho18/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu".to_string(),
+    ];
     let run_compiler = rustc_driver::RunCompiler::new(&rustc_args, &mut callbacks);
     run_compiler.run();
 }
